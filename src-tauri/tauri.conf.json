@@ -29,7 +29,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCQTFCNzZDMjEwQzg3MDAKUldRQWh3d2hiTGVoKyt4N2NLOGd5QnpLYzRCWllBTnBMendWazBOK01FN0VVajkxMHAwdVhwMVkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUzN0FFNTc3OUIwM0Q0QzAKUldUQTFBT2JkK1Y2NHpVSEE1MW5oRnBXK0hRT3N4V3JMVEVVekEyKzZMUWVrTGNDUUlXanowUW0K",
       "endpoints": [
         "https://github.com/djvpri/zgym_windows/releases/latest/download/latest.json"
       ]
