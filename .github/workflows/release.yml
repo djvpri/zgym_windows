@@ -1,0 +1,59 @@
+name: release
+
+# Rilis ZGym Desktop: build setup.exe + create/upload GitHub Release.
+# Dipanggil manual via workflow_dispatch (tak perlu private key lokal).
+# Versi sejati exe berasal dari src-tauri/Cargo.toml (CARGO_PKG_VERSION).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versi yang dirilis, mis. 0.1.0 (tanpa awalan v)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Assert Cargo.toml version == inputs.version
+        shell: bash
+        run: |
+          CV="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)"
+          echo "Cargo.toml version=$CV  inputs.version=${{ inputs.version }}"
+          if [ "$CV" != "${{ inputs.version }}" ]; then
+            echo "::error::Cargo.toml version ($CV) != inputs.version (${{ inputs.version }}). Bump src-tauri/Cargo.toml + tauri.conf.json + version di commit_guard (kalau ada) sebelum rilis."; exit 1
+          fi
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Install NSIS (bundler butuh makensis)
+        shell: bash
+        run: choco install nsis -y --no-progress || true
+
+      - name: Build (release + NSIS)
+        working-directory: src-tauri
+        run: cargo tauri build
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
+          echo "setup: $SETUP"
+          gh release create "v${VERSION}" "$SETUP" \
+            --repo "${{ github.repository }}" \
+            --title "ZGym Desktop v${VERSION}" \
+            --notes "Rilis desktop ZGym. Unduh setup.exe utk install (current user). Seluruh fitur = ZGym SaaS di server (thin-client)."
