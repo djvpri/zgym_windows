@@ -1,6 +1,6 @@
 [package]
 name = "zgym-desktop"
-version = "0.1.1"
+version = "0.1.2"
 description = "ZGym Desktop — thin-client Tauri ke ZGym (SaaS gym management)"
 authors = ["zomet"]
 edition = "2021"

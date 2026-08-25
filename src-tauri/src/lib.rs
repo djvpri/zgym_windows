@@ -7,10 +7,11 @@ use tauri::{
     Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
-// URL default ZGym prod. Override via env ZGym_URL (staging/uji lokal).
+// URL default ZGym prod (langsung ke login). Override via env ZGym_URL
+// (staging/uji lokal). Kalau session uda aktif, NextAuth redirect ke dashboard.
 fn zgym_url() -> String {
     std::env::var("ZGym_URL")
-        .unwrap_or_else(|_| "https://zgym-production.up.railway.app".to_string())
+        .unwrap_or_else(|_| "https://zgym-production.up.railway.app/login".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
