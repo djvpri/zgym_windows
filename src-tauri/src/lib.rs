@@ -26,7 +26,9 @@ pub fn run() {
                 }
             }),
         )
-        .setup(|app| {
+        .setup(move |app| {
+            // `move` menangkap `url` by value (closure `'static`; hindari
+            // E0373: closure outlive pemilik `url`).
             // Buka ZGym di window utama. `WebviewUrl::External` = load URL
             // tambahan langsung, bukan asset lokal index.html.
             let _w = WebviewWindowBuilder::new(
