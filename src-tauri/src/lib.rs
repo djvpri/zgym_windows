@@ -29,8 +29,12 @@ pub fn run() {
         .setup(|app| {
             // Buka ZGym di window utama. `WebviewUrl::External` = load URL
             // tambahan langsung, bukan asset lokal index.html.
-            let _w = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
-                .title("ZGym")
+            let _w = WebviewWindowBuilder::new(
+                app,
+                "main",
+                WebviewUrl::External(url.parse::<tauri::Url>().unwrap()),
+            )
+            .title("ZGym")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(960.0, 640.0)
                 .build()
