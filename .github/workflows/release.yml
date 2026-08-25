@@ -49,6 +49,8 @@ jobs:
       - name: Stage assets (portable + setup)
         shell: bash
         working-directory: src-tauri
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           # Portable = raw exe (jalan tanpa installer); non-portable = NSIS setup.
           cp target/release/zgym-desktop.exe "ZGym_${VERSION}_x64.exe"
