@@ -16,6 +16,9 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write   # GITHUB_TOKEN butuh ini utk gh release create (larangan:default read-only)
+    env:
+      TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ github.workspace }}/signing.key
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
 
@@ -46,6 +49,12 @@ jobs:
         working-directory: src-tauri
         run: cargo tauri build
 
+      - name: Restore signing key from secret
+        shell: bash
+        run: |
+          printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" > "${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}"
+          ls -la "${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}"
+
       - name: Stage assets (portable + setup)
         shell: bash
         working-directory: src-tauri
@@ -56,6 +65,49 @@ jobs:
           cp target/release/zgym-desktop.exe "ZGym_${VERSION}_x64.exe"
           ls -la target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe "ZGym_${VERSION}_x64.exe"
 
+      # Sign setup.exe. Output: <setup>.exe.sig (satu baris base64) = RAW signature.
+      - name: Sign setup.exe
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
+          echo "signing: $SETUP"
+          cargo tauri signer sign \
+            --private-key-path "${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}" \
+            --password "${{ env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" \
+            "$SETUP"
+          ls -la "$SETUP.sig"
+        env:
+          VERSION: ${{ inputs.version }}
+
+      - name: Build latest.json (manifest updater)
+        shell: bash
+        working-directory: src-tauri
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          SIG="$(cat "target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe.sig")"
+          # signature = RAW isi .sig (JANGAN re-encode); url = nama dotted ZGym_<v>_x64-setup.exe
+          python - <<PY
+          import json, datetime
+          sig = "$SIG"
+          version = "$VERSION"
+          url = "https://github.com/djvpri/zgym_windows/releases/download/v{}/ZGym_{}_x64-setup.exe".format(version, version)
+          man = {
+            "version": version,
+            "notes": "ZGym Desktop v%s" % version,
+            "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "platforms": {"windows-x86_64": {
+              "signature": sig,
+              "url": url,
+            }},
+          }
+          with open("latest.json", "w") as f:
+            json.dump(man, f)
+          print("latest.json:", open("latest.json").read()[:200])
+          PY
+          ls -la latest.json
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,9 +117,11 @@ jobs:
         run: |
           SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
           PORTABLE="$(ls ZGym_${VERSION}_x64.exe)"
+          LATEST="latest.json"
           echo "setup: $SETUP"
           echo "portable: $PORTABLE"
-          gh release create "v${VERSION}" "$SETUP" "$PORTABLE" \
+          echo "latest: $LATEST"
+          gh release create "v${VERSION}" "$SETUP" "$PORTABLE" "$LATEST" \
             --repo "${{ github.repository }}" \
             --title "ZGym Desktop v${VERSION}" \
-            --notes "Rilis desktop ZGym (thin-client ke ZGym SaaS).\n\nDua versi:\n- **Portable**: \`ZGym_${VERSION}_x64.exe\` — langsung jalan tanpa install.\n- **Non-portable**: \`ZGym_${VERSION}_x64-setup.exe\` — install ke current user, bikin shortcut.\n\nSemua fitur = ZGym di server (login online, multi-tenant)."
+            --notes $'Rilis desktop ZGym (thin-client ke ZGym SaaS).\n\nDua versi:\\n- **Portable**: zgym_${VERSION}_x64.exe — langsung jalan tanpa install.\\n- **Non-portable**: zgym_${VERSION}_x64-setup.exe — install ke current user, bikin shortcut.\n\nSemua fitur = ZGym di server (login online, multi-tenant).'
