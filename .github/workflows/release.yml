@@ -46,6 +46,14 @@ jobs:
         working-directory: src-tauri
         run: cargo tauri build
 
+      - name: Stage assets (portable + setup)
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          # Portable = raw exe (jalan tanpa installer); non-portable = NSIS setup.
+          cp target/release/zgym-desktop.exe "ZGym_${VERSION}_x64.exe"
+          ls -la target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe "ZGym_${VERSION}_x64.exe"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,8 +62,10 @@ jobs:
         working-directory: src-tauri
         run: |
           SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
+          PORTABLE="$(ls ZGym_${VERSION}_x64.exe)"
           echo "setup: $SETUP"
-          gh release create "v${VERSION}" "$SETUP" \
+          echo "portable: $PORTABLE"
+          gh release create "v${VERSION}" "$SETUP" "$PORTABLE" \
             --repo "${{ github.repository }}" \
             --title "ZGym Desktop v${VERSION}" \
-            --notes "Rilis desktop ZGym. Unduh setup.exe utk install (current user). Seluruh fitur = ZGym SaaS di server (thin-client)."
+            --notes "Rilis desktop ZGym (thin-client ke ZGym SaaS).\n\nDua versi:\n- **Portable**: \`ZGym_${VERSION}_x64.exe\` — langsung jalan tanpa install.\n- **Non-portable**: \`ZGym_${VERSION}_x64-setup.exe\` — install ke current user, bikin shortcut.\n\nSemua fitur = ZGym di server (login online, multi-tenant)."
