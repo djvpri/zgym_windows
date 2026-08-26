@@ -11,7 +11,7 @@ use tauri::{
 // (staging/uji lokal). Kalau session uda aktif, NextAuth redirect ke dashboard.
 fn zgym_url() -> String {
     std::env::var("ZGym_URL")
-        .unwrap_or_else(|_| "https://zgym-production.up.railway.app/login".to_string())
+        .unwrap_or_else(|_| "https://zxgym.zomet.my.id/login".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
