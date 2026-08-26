@@ -1,12 +1,12 @@
 [package]
-name = "zgym-desktop"
-version = "0.1.4"
-description = "ZGym Desktop — thin-client Tauri ke ZGym (SaaS gym management)"
+name = "zxgym-desktop"
+version = "0.1.5"
+description = "ZXgym Desktop — thin-client Tauri ke ZXgym (SaaS gym management)"
 authors = ["zomet"]
 edition = "2021"
 
 [lib]
-name = "zgym_desktop_lib"
+name = "zxgym_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

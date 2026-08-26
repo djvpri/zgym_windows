@@ -1,6 +1,6 @@
 name: release
 
-# Rilis ZGym Desktop: build setup.exe + create/upload GitHub Release.
+# Rilis ZXgym Desktop: build setup.exe + create/upload GitHub Release.
 # Dipanggil manual via workflow_dispatch (tak perlu private key lokal).
 # Versi sejati exe berasal dari src-tauri/Cargo.toml (CARGO_PKG_VERSION).
 on:
@@ -62,15 +62,15 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           # Portable = raw exe (jalan tanpa installer); non-portable = NSIS setup.
-          cp target/release/zgym-desktop.exe "ZGym_${VERSION}_x64.exe"
-          ls -la target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe "ZGym_${VERSION}_x64.exe"
+          cp target/release/zxgym-desktop.exe "ZXgym_${VERSION}_x64.exe"
+          ls -la target/release/bundle/nsis/ZXgym_${VERSION}_x64-setup.exe "ZXgym_${VERSION}_x64.exe"
 
       # Sign setup.exe. Output: <setup>.exe.sig (satu baris base64) = RAW signature.
       - name: Sign setup.exe
         shell: bash
         working-directory: src-tauri
         run: |
-          SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
+          SETUP="$(ls target/release/bundle/nsis/ZXgym_${VERSION}_x64-setup.exe)"
           echo "signing: $SETUP"
           cargo tauri signer sign \
             --private-key-path "${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}" \
@@ -86,16 +86,16 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          SIG="$(cat "target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe.sig")"
-          # signature = RAW isi .sig (JANGAN re-encode); url = nama dotted ZGym_<v>_x64-setup.exe
+          SIG="$(cat "target/release/bundle/nsis/ZXgym_${VERSION}_x64-setup.exe.sig")"
+          # signature = RAW isi .sig (JANGAN re-encode); url = nama dotted ZXgym_<v>_x64-setup.exe
           python - <<PY
           import json, datetime
           sig = "$SIG"
           version = "$VERSION"
-          url = "https://github.com/djvpri/zgym_windows/releases/download/v{}/ZGym_{}_x64-setup.exe".format(version, version)
+          url = "https://github.com/djvpri/zgym_windows/releases/download/v{}/ZXgym_{}_x64-setup.exe".format(version, version)
           man = {
             "version": version,
-            "notes": "ZGym Desktop v%s" % version,
+            "notes": "ZXgym Desktop v%s" % version,
             "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "platforms": {"windows-x86_64": {
               "signature": sig,
@@ -115,13 +115,13 @@ jobs:
         shell: bash
         working-directory: src-tauri
         run: |
-          SETUP="$(ls target/release/bundle/nsis/ZGym_${VERSION}_x64-setup.exe)"
-          PORTABLE="$(ls ZGym_${VERSION}_x64.exe)"
+          SETUP="$(ls target/release/bundle/nsis/ZXgym_${VERSION}_x64-setup.exe)"
+          PORTABLE="$(ls ZXgym_${VERSION}_x64.exe)"
           LATEST="latest.json"
           echo "setup: $SETUP"
           echo "portable: $PORTABLE"
           echo "latest: $LATEST"
           gh release create "v${VERSION}" "$SETUP" "$PORTABLE" "$LATEST" \
             --repo "${{ github.repository }}" \
-            --title "ZGym Desktop v${VERSION}" \
-            --notes $'Rilis desktop ZGym (thin-client ke ZGym SaaS).\n\nDua versi:\\n- **Portable**: zgym_${VERSION}_x64.exe — langsung jalan tanpa install.\\n- **Non-portable**: zgym_${VERSION}_x64-setup.exe — install ke current user, bikin shortcut.\n\nSemua fitur = ZGym di server (login online, multi-tenant).'
+            --title "ZXgym Desktop v${VERSION}" \
+            --notes $'Rilis desktop ZXgym (thin-client ke ZXgym SaaS).\n\nDua versi:\\n- **Portable**: ZXgym_${VERSION}_x64.exe — langsung jalan tanpa install.\\n- **Non-portable**: ZXgym_${VERSION}_x64-setup.exe — install ke current user, bikin shortcut.\n\nSemua fitur = ZXgym di server (login online, multi-tenant).'

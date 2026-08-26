@@ -1,6 +1,6 @@
 name: build-windows
 
-# Compile check + paket Windows utk ZGym Desktop (thin-client Tauri ke ZGym SaaS).
+# Compile check + paket Windows utk ZXgym Desktop (thin-client Tauri ke ZXgym SaaS).
 # Jalan saat push/pull ke main — judge utama verifikasi kode Rust compile di Windows.
 # Rilis (setup.exe upload) via workflow_dispatch yg dipanggil manual: [release pipeline].
 on:
@@ -42,6 +42,6 @@ jobs:
       - name: Upload setup.exe artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zgym-setup
+          name: zxgym-setup
           path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
