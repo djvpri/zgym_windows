@@ -31,6 +31,12 @@ pub fn run() {
             // E0373: closure outlive pemilik `url`).
             // Buka ZXgym di window utama. `WebviewUrl::External` = load URL
             // tambahan langsung, bukan asset lokal index.html.
+            // Persist WebView2 user-data ke folder data app supaya cookie session
+            // (NextAuth/SSO) TIDAK hilang antar restart -> user tak perlu login ulang.
+            let wv_data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("Failed to resolve app data dir");
             let _w = WebviewWindowBuilder::new(
                 app,
                 "main",
@@ -39,6 +45,7 @@ pub fn run() {
             .title("ZXgym")
             .inner_size(1280.0, 820.0)
             .min_inner_size(960.0, 640.0)
+            .data_directory(wv_data_dir)
             .build()
             .expect("Failed to build ZXgym window");
 
