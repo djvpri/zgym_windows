@@ -7,11 +7,12 @@ use tauri::{
     Manager, WebviewUrl, WebviewWindowBuilder,
 };
 
-// URL default ZXgym prod (langsung ke login). Override via env ZXgym_URL
-// (staging/uji lokal). Kalau session uda aktif, NextAuth redirect ke dashboard.
+// URL default ZXgym prod (langsung ke dashboard). Override via env ZXgym_URL
+// (staging/uji lokal). Middleware NextAuth otomatis: kalau session ada -> dashboard;
+// kalau belum -> redirect /login -> Z One (hub SSO) -> balik /sso -> dashboard.
 fn zxgym_url() -> String {
     std::env::var("ZXgym_URL")
-        .unwrap_or_else(|_| "https://zxgym.zomet.my.id/login".to_string())
+        .unwrap_or_else(|_| "https://zxgym.zomet.my.id/dashboard".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
