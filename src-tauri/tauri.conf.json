@@ -9,9 +9,14 @@
   "app": {
     "security": {
       "csp": null,
-      "dangerousRemoteDomainIpcAccess": [
-        { "scheme": "https", "domain": "zxgym.zomet.my.id", "windows": ["main"] }
-      ]
+      "headers": {
+        "Access-Control-Allow-Origin": [
+          "https://zxgym.zomet.my.id",
+          "tauri://localhost"
+        ],
+        "Access-Control-Allow-Methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "Access-Control-Allow-Credentials": true
+      }
     },
     "withGlobalTauri": true
   },
