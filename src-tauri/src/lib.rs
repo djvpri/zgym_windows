@@ -8,16 +8,23 @@ use tauri::{
 };
 
 // ===== Cetak nota thermal (ESC/POS) via Windows Print Spooler (winspool) =====
-// Disalin dari pola z1-kasir (zpos-kasir) yang terbukti hasil nota paling bagus:
-// terjemahkan nota ke byte ESC/POS mentah di frontend, kirim LANGSUNG ke driver
-// printer via OpenPrinterW/StartDocPrinterW/WritePrinter (pDatatype "RAW").
-// Printer render dgn DPI aslinya (bukan lewat dialog browser) -> tegas, tak buram.
+// Disalin dari pola z1-kasir (zpos-kasir): terjemahkan nota ke byte ESC/POS mentah
+// di frontend, kirim langsung ke driver printer via OpenPrinterW/StartDocPrinterW/
+// WritePrinter (pDatatype "RAW"). Printer render dgn DPI aslinya -> tegas, tak buram.
+//
+// KOMUNIKASI web <-> desktop: THIN-CLIENT ini memuat web ZXgym dari domain remote
+// (https://zxgym.zomet.my.id). Remote webview TIDAK RI pasti bisa invoke Tauri IPC
+// (perlu dangerousRemoteDomainIpcAccess yg belum tentu di schema), jd dipakai jalur
+// paling andal: HTTP loopback (127.0.0.1:39777) yg di-bind oleh app sendiri saat
+// startup. Web fetch ke localhost tsb (CORS *), server terima dan jalankan winspool.
+// Ini bypass semua hambatan IPC/schema Tauri utk remote domain.
 
-/// Daftar printer terpasang di Windows. Dipakai frontend utk dropdown "Printer".
-/// Salin pola z1-kasir: PRINTER_INFO_1W + flags local|connections (biar printer
-/// USB lokal & shared jaringan ikut; BT virtual COM di luar spooler — tak muncul).
-#[tauri::command]
-fn daftar_printer() -> Result<Vec<String>, String> {
+const LOOPBACK: u16 = 39777; // port fixed loopback (single-instance -> hanya 1 server)
+
+// Daftar printer terpasang di Windows. Dipakai frontend utk dropdown "Printer".
+// Pola z1-kasir: PRINTER_INFO_1W + flags local|connections (USB lokal & shared
+// jaringan ikut; BT virtual COM di luar spooler — tak muncul).
+fn _daftar_printer_local() -> Result<Vec<String>, String> {
     #[cfg(windows)]
     {
         use windows::Win32::Graphics::Printing::{EnumPrintersW, PRINTER_INFO_1W};
@@ -26,9 +33,9 @@ fn daftar_printer() -> Result<Vec<String>, String> {
         let flags: u32 = PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS;
         let mut needed: u32 = 0;
         let mut returned: u32 = 0;
-        // pass 1: hitung ukuran buffer. EnumPrintersW dgn buffer None (NULL) return
-        // FALSE + ERROR_INSUFFICIENT_BUFFER (0x8007007A) utk query ukuran — ini
-        // perilaku DUA-PASS yg diharapkan, BUKAN gagal. Jangan `?`; baca `needed`.
+        // pass 1: hitung ukuran buffer. EnumPrintersW dgn buffer NULL (None) return
+        // FALSE + ERROR_INSUFFICIENT_BUFFER utk query ukuran — PERILAKU dua-pass yg
+        // diharapkan, BUKAN kegagalan. Jangan `?`; cukup baca `needed`.
         let _hr = unsafe { EnumPrintersW(flags, None, 1, None, &mut needed, &mut returned) };
         if needed == 0 {
             return Ok(Vec::new());
@@ -68,9 +75,8 @@ fn daftar_printer() -> Result<Vec<String>, String> {
     }
 }
 
-/// Kirim byte ESC/POS mentah ke printer thermal terpilih.
-#[tauri::command]
-fn cetak_escpos(escpos: String, nama_printer: String) -> Result<String, String> {
+// Kirim byte ESC/POS mentah ke printer thermal terpilih.
+fn _cetak_escpos_local(escpos: &str, nama_printer: &str) -> Result<String, String> {
     #[cfg(windows)]
     {
         use std::os::raw::c_void;
@@ -121,6 +127,69 @@ fn cetak_escpos(escpos: String, nama_printer: String) -> Result<String, String> 
     }
 }
 
+/// Command Tauri (kompat jalur IPC lama). Frontend utamanya pakai loopback HTTP.
+#[tauri::command]
+fn daftar_printer() -> Result<Vec<String>, String> {
+    _daftar_printer_local()
+}
+
+/// Command Tauri (kompat jalur IPC lama). Frontend utamanya pakai loopback HTTP.
+#[tauri::command]
+fn cetak_escpos(escpos: String, nama_printer: String) -> Result<String, String> {
+    _cetak_escpos_local(&escpos, &nama_printer)
+}
+
+// ===== Loopback HTTP server (web ZXgym remote -> app desktop) =====
+// Endpoint:
+//   GET  /ping          -> {"ok":true} (deteksi desktop oleh halaman web)
+//   POST /printers      -> {"printers":[...]}
+//   POST /cetak         body {"escpos":"...","printer":"..."} -> {"ok":"msg"}
+// CORS: allow-all origin (loopback lokal, konsumen web remote zxgym).
+
+fn spawn_http_server() {
+    std::thread::spawn(|| {
+        if let Ok(listener) = std::net::TcpListener::bind(("127.0.0.1", LOOPBACK)) {
+            for stream in listener.incoming().flatten() {
+                std::thread::spawn(|| handle_conn(stream));
+            }
+        }
+    });
+}
+
+fn handle_conn(mut stream: std::net::TcpStream) {
+    use std::io::{Read, Write};
+    let mut buf = [0u8; 8192];
+    let n = stream.read(&mut buf).unwrap_or(0);
+    let req = String::from_utf8_lossy(&buf[..n]);
+    let first = req.lines().next().unwrap_or("");
+    let mut parts = first.split_whitespace();
+    let _method = parts.next().unwrap_or("");
+    let path = parts.next().unwrap_or("/");
+    let (_, body) = req.split_once("\r\n\r\n").unwrap_or((&req[..], ""));
+    let cor = "Access-Control-Allow-Origin: *\r\n";
+    let hdr = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n".to_string();
+    let out: String = match (path, body) {
+        ("/ping", _) => format!("{hdr}{cor}Connection: close\r\n\r\n{{\"ok\":true}}"),
+        ("/printers", _) => match _daftar_printer_local() {
+            Ok(p) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"printers": p})),
+            Err(e) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"error": e})),
+        },
+        ("/cetak", b) => {
+            let parsed: serde_json::Value = serde_json::from_str(if b.is_empty() { "{}" } else { b })
+                .unwrap_or(serde_json::Value::Null);
+            let escpos = parsed.get("escpos").and_then(|v| v.as_str()).unwrap_or("");
+            let printer = parsed.get("printer").and_then(|v| v.as_str()).unwrap_or("");
+            match _cetak_escpos_local(escpos, printer) {
+                Ok(msg) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"ok": msg})),
+                Err(e) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"error": e})),
+            }
+        }
+        _ => format!("{hdr}{cor}Connection: close\r\n\r\n{{\"error\":\"not found\"}}"),
+    };
+    let _ = stream.write_all(out.as_bytes());
+    let _ = stream.flush();
+}
+
 // URL default ZXgym prod (langsung ke dashboard). Override via env ZXgym_URL
 // (staging/uji lokal). Middleware NextAuth otomatis: kalau session ada -> dashboard;
 // kalau belum -> redirect /login -> Z One (hub SSO) -> balik /sso -> dashboard.
@@ -143,6 +212,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![daftar_printer, cetak_escpos])
         .setup(move |app| {
+            // Loopback HTTP server utk web remote (ZXgym) -> cetak/printer.
+            spawn_http_server();
             // `move` menangkap `url` by value (closure `'static`; hindari
             // E0373: closure outlive pemilik `url`).
             // Buka ZXgym di window utama. `WebviewUrl::External` = load URL
