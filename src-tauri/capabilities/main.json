@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "zgym-main",
+  "description": "Capabilities utk window main ZXgym: izinkan invoke command cetak (daftar_printer, cetak_escpos) dari remote webview ZXgym.",
+  "windows": ["main"],
+  "permissions": ["core:default"],
+  "remote": {
+    "urls": ["https://zxgym.zomet.my.id/*"]
+  }
+}
