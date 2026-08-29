@@ -158,33 +158,53 @@ fn spawn_http_server() {
 
 fn handle_conn(mut stream: std::net::TcpStream) {
     use std::io::{Read, Write};
-    let mut buf = [0u8; 8192];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let req = String::from_utf8_lossy(&buf[..n]);
+    // baca request penuh sampai header Content-Length terpenuhi (body ESC/POS bs besar)
+    let mut buf: Vec<u8> = Vec::new();
+    let mut chunk = [0u8; 4096];
+    loop {
+        let n = stream.read(&mut chunk).unwrap_or(0);
+        if n == 0 { break; }
+        buf.extend_from_slice(&chunk[..n]);
+        if let Ok(s) = std::str::from_utf8(&buf) {
+            if let Some((h, b)) = s.split_once("\r\n\r\n") {
+                let cl = h.lines().find_map(|l| {
+                    l.to_ascii_lowercase().strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok())
+                }).unwrap_or(0);
+                if cl == 0 || b.len() >= cl { break; }
+            }
+        }
+    }
+    let req = String::from_utf8_lossy(&buf);
     let first = req.lines().next().unwrap_or("");
     let mut parts = first.split_whitespace();
-    let _method = parts.next().unwrap_or("");
-    let path = parts.next().unwrap_or("/");
-    let (_, body) = req.split_once("\r\n\r\n").unwrap_or((&req[..], ""));
+    let method = parts.next().unwrap_or("").to_ascii_uppercase();
+    let path = parts.next().unwrap_or("/").to_string();
+    let body = req.split_once("\r\n\r\n").map(|(_, b)| b.to_string()).unwrap_or_default();
+
     let cor = "Access-Control-Allow-Origin: *\r\n";
-    let hdr = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n".to_string();
-    let out: String = match (path, body) {
-        ("/ping", _) => format!("{hdr}{cor}Connection: close\r\n\r\n{{\"ok\":true}}"),
-        ("/printers", _) => match _daftar_printer_local() {
-            Ok(p) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"printers": p})),
-            Err(e) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"error": e})),
+    let acc = "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\n";
+    let hdr = format!("{cor}{acc}Content-Type: application/json\r\nConnection: close\r\n");
+    let ok = |extra: &str| format!("HTTP/1.1 200 OK\r\n{hdr}{extra}\r\n");
+    let okbody = |body: String| format!("HTTP/1.1 200 OK\r\n{hdr}\r\n{body}");
+
+    let out: String = match (method.as_str(), path.as_str()) {
+        ("OPTIONS", _) => ok(""), // preflight CORS -> 204/200 dgn header izin
+        ("GET", "/ping") => okbody("{\"ok\":true}".into()),
+        ("GET", "/printers") => match _daftar_printer_local() {
+            Ok(p) => okbody(serde_json::json!({"printers": p}).to_string()),
+            Err(e) => okbody(serde_json::json!({"error": e}).to_string()),
         },
-        ("/cetak", b) => {
-            let parsed: serde_json::Value = serde_json::from_str(if b.is_empty() { "{}" } else { b })
+        ("POST", "/cetak") => {
+            let parsed: serde_json::Value = serde_json::from_str(if body.is_empty() { "{}" } else { &body })
                 .unwrap_or(serde_json::Value::Null);
             let escpos = parsed.get("escpos").and_then(|v| v.as_str()).unwrap_or("");
             let printer = parsed.get("printer").and_then(|v| v.as_str()).unwrap_or("");
             match _cetak_escpos_local(escpos, printer) {
-                Ok(msg) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"ok": msg})),
-                Err(e) => format!("{hdr}{cor}Connection: close\r\n\r\n{}", serde_json::json!({"error": e})),
+                Ok(msg) => okbody(serde_json::json!({"ok": msg}).to_string()),
+                Err(e) => okbody(serde_json::json!({"error": e}).to_string()),
             }
         }
-        _ => format!("{hdr}{cor}Connection: close\r\n\r\n{{\"error\":\"not found\"}}"),
+        _ => okbody("{\"error\":\"not found\"}".into()),
     };
     let _ = stream.write_all(out.as_bytes());
     let _ = stream.flush();
