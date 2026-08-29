@@ -189,7 +189,7 @@ fn handle_conn(mut stream: std::net::TcpStream) {
 
     let out: String = match (method.as_str(), path.as_str()) {
         ("OPTIONS", _) => ok(""), // preflight CORS -> 204/200 dgn header izin
-        ("GET", "/ping") => okbody("{\"ok\":true}".into()),
+        ("GET", "/ping") => okbody(serde_json::json!({"ok": true, "version": env!("CARGO_PKG_VERSION")}).to_string()),
         ("GET", "/printers") => match _daftar_printer_local() {
             Ok(p) => okbody(serde_json::json!({"printers": p}).to_string()),
             Err(e) => okbody(serde_json::json!({"error": e}).to_string()),
