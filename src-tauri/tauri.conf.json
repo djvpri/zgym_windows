@@ -10,12 +10,11 @@
     "security": {
       "csp": null,
       "headers": {
-        "Access-Control-Allow-Origin": [
-          "https://zxgym.zomet.my.id",
-          "tauri://localhost"
-        ],
-        "Access-Control-Allow-Methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "Access-Control-Allow-Credentials": true
+        "Access-Control-Allow-Origin": ["https://zxgym.zomet.my.id"],
+        "Access-Control-Allow-Methods": ["GET", "POST"],
+        "Access-Control-Allow-Headers": ["Content-Type"],
+        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Expose-Headers": ["*"]
       }
     },
     "withGlobalTauri": true
