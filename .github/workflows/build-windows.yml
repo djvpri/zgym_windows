@@ -29,7 +29,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+        run: cargo install tauri-cli --version "^2"
 
       - name: Install NSIS (bundler butuh makensis)
         shell: bash
