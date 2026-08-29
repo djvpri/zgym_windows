@@ -16,7 +16,7 @@ use tauri::{
 /// Daftar printer terpasang di Windows. Dipakai frontend utk dropdown "Printer".
 /// Salin pola z1-kasir: PRINTER_INFO_1W + flags local|connections (biar printer
 /// USB lokal & shared jaringan ikut; BT virtual COM di luar spooler — tak muncul).
-#[cfg_attr(mobile, tauri::command)]
+#[tauri::command]
 fn daftar_printer() -> Result<Vec<String>, String> {
     #[cfg(windows)]
     {
@@ -69,7 +69,7 @@ fn daftar_printer() -> Result<Vec<String>, String> {
 }
 
 /// Kirim byte ESC/POS mentah ke printer thermal terpilih.
-#[cfg_attr(mobile, tauri::command)]
+#[tauri::command]
 fn cetak_escpos(escpos: String, nama_printer: String) -> Result<String, String> {
     #[cfg(windows)]
     {
