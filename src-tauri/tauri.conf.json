@@ -1,14 +1,17 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ZXgym",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "identifier": "com.zomet.zxgym.desktop",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousRemoteDomainIpcAccess": [
+        { "scheme": "https", "domain": "zxgym.zomet.my.id", "windows": ["main"] }
+      ]
     },
     "withGlobalTauri": true
   },
